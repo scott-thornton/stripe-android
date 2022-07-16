@@ -306,7 +306,7 @@ class GooglePayLauncher internal constructor(
                 resultCallback::onResult
             )
 
-            return remember {
+            return remember(config, readyCallback, resultCallback) {
                 GooglePayLauncher(
                     lifecycleScope = lifecycleScope,
                     config = config,
