@@ -38,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import coil.compose.AsyncImage
 import com.airbnb.mvrx.Async
 import com.airbnb.mvrx.Fail
 import com.airbnb.mvrx.Loading
@@ -52,6 +51,7 @@ import com.stripe.android.financialconnections.exception.InstitutionUnplannedExc
 import com.stripe.android.financialconnections.features.failure.InstitutionPlannedDowntimeErrorContent
 import com.stripe.android.financialconnections.features.failure.InstitutionUnplannedDowntimeErrorContent
 import com.stripe.android.financialconnections.features.failure.UnclassifiedErrorContent
+import com.stripe.android.financialconnections.image.StripeImage
 import com.stripe.android.financialconnections.model.Institution
 import com.stripe.android.financialconnections.model.InstitutionResponse
 import com.stripe.android.financialconnections.ui.components.FinancialConnectionsOutlinedTextField
@@ -312,10 +312,10 @@ private fun InstitutionResultTile(
             .clickable { onInstitutionSelected(institution) }
             .padding(vertical = 8.dp)
     ) {
-        AsyncImage(
-            model = "https://www.fillmurray.com/50/50",
-            // model = painterResource(id = R.drawable.stripe_ic_brandicon_institution),
-            contentDescription = null,
+        StripeImage(
+            url = "https://js.stripe.com/v3/fingerprinted/img/BrandIcon--boa-0cb45064a3d70aadf6dc093c3a839e5d.svg",
+            placeholderResId = R.drawable.stripe_ic_brandicon_institution,
+            // contentDescription = null,
             modifier = Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(6.dp))
