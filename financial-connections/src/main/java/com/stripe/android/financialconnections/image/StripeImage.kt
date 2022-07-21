@@ -2,7 +2,6 @@ package com.stripe.android.financialconnections.image
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.util.Log
 import androidx.annotation.DrawableRes
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.foundation.Image
@@ -30,7 +29,8 @@ import java.net.URL
 internal fun StripeImage(
     url: String,
     @DrawableRes placeholderResId: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentDescription: String? = null
 ) {
     BoxWithConstraints(modifier) {
         val context = LocalContext.current
@@ -66,7 +66,11 @@ internal fun StripeImage(
                 loadImageJob?.cancel()
             }
         }
-        Image(modifier = modifier, contentDescription = "", bitmap = imageBitmapState.value)
+        Image(
+            modifier = modifier,
+            contentDescription = contentDescription,
+            bitmap = imageBitmapState.value
+        )
     }
 }
 

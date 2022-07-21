@@ -276,7 +276,6 @@ private fun SearchInstitutionsList(
                     }
                 }
                 is Success -> {
-
                     if (institutions().data.isEmpty()) {
                         item {
                             Text(
@@ -313,9 +312,9 @@ private fun InstitutionResultTile(
             .padding(vertical = 8.dp)
     ) {
         StripeImage(
-            url = "https://js.stripe.com/v3/fingerprinted/img/BrandIcon--boa-0cb45064a3d70aadf6dc093c3a839e5d.svg",
+            url = "https://www.fillmurray.com/g/50/50",
             placeholderResId = R.drawable.stripe_ic_brandicon_institution,
-            // contentDescription = null,
+            contentDescription = "",
             modifier = Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(6.dp))
