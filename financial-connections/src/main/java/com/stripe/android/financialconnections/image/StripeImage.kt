@@ -2,23 +2,24 @@ package com.stripe.android.financialconnections.image
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import androidx.annotation.DrawableRes
-import androidx.appcompat.content.res.AppCompatResources
+import android.util.Log
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxWithConstraintsScope
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.Dp.Companion.Infinity
 import androidx.compose.ui.unit.IntSize.Companion.Zero
-import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -28,50 +29,54 @@ import java.net.URL
 @Composable
 internal fun StripeImage(
     url: String,
-    @DrawableRes placeholderResId: Int,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null
+    placeHolder: Painter,
+    memoryCache: LruCache<String, Bitmap> = imageMemoryCache,
+    contentDescription: String? = null,
+    modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier) {
-        val context = LocalContext.current
         val (width, height) = calculateBoxSize()
-        val imageBitmapState = remember { mutableStateOf(ImageBitmap(width, height)) }
+        val painter: MutableState<Painter> =
+            remember { mutableStateOf(BitmapPainter(ImageBitmap(width, height))) }
         var loadImageJob: Job?
         val scope = rememberCoroutineScope()
 
         DisposableEffect(url) {
-            var currentStream: InputStream? = null
+            val imageLoader = ImageLoader()
             loadImageJob = scope.launch(Dispatchers.Default) {
-                try {
-                    imageBitmapState.value = decodeSampledBitmap(width, height) { options ->
-                        BitmapFactory.decodeStream(
-                            URL(url).openStream().also { stream -> currentStream = stream },
-                            null,
-                            options
+                painter.value = memoryCache.get(url)
+                    ?.let { BitmapPainter(it.asImageBitmap()) }
+                    ?: imageLoader.load(url, width, height)
+                        .fold(
+                            onSuccess = { bitmap ->
+                                debug("Image loaded")
+                                memoryCache.put(url, bitmap)
+                                BitmapPainter(bitmap.asImageBitmap())
+                            },
+                            onFailure = {
+                                debug("Image failed loading")
+                                it.printStackTrace()
+                                placeHolder
+                            }
                         )
-                    }.asImageBitmap()
-                } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
-                    // upon any exception loading the
-                    e.printStackTrace()
-                    AppCompatResources
-                        .getDrawable(context, placeholderResId)
-                        ?.toBitmap()
-                        ?.asImageBitmap()
-                        ?.let { imageBitmapState.value = it }
-                }
+
             }
             onDispose {
-                imageBitmapState.value = ImageBitmap(width, height)
-                currentStream?.close()
+                painter.value = BitmapPainter(ImageBitmap(width, height))
+                imageLoader.cancel()
                 loadImageJob?.cancel()
             }
         }
         Image(
             modifier = modifier,
             contentDescription = contentDescription,
-            bitmap = imageBitmapState.value
+            painter = painter.value
         )
     }
+}
+
+fun debug(message: String) {
+    Log.d("StripeImage", message)
 }
 
 private fun BoxWithConstraintsScope.calculateBoxSize(): Pair<Int, Int> {
@@ -99,50 +104,66 @@ private fun BoxWithConstraintsScope.calculateBoxSize(): Pair<Int, Int> {
     return Pair(width, height)
 }
 
-private fun calculateInSampleSize(
-    options: BitmapFactory.Options,
-    reqWidth: Int,
-    reqHeight: Int
-): Int {
-    // Raw height and width of image
-    val (height: Int, width: Int) = options.run { outHeight to outWidth }
-    var inSampleSize = 1
+// TODO@carlosmuvi scope this to SDK lifecycle and remove static reference.
+private val imageMemoryCache = object : LruCache<String, Bitmap>(
+    // Use 1/8th of the available memory for this memory cache.
+    (Runtime.getRuntime().maxMemory() / 1024).toInt() / 8
+) {
+    override fun sizeOf(key: String, bitmap: Bitmap): Int {
+        return bitmap.byteCount / 1024
+    }
+}
 
-    if (height > reqHeight || width > reqWidth) {
+private class ImageLoader {
+    var currentInputStream: InputStream? = null
 
-        val halfHeight: Int = height / 2
-        val halfWidth: Int = width / 2
-
-        // Calculate the largest inSampleSize value that is a power of 2 and keeps both
-        // height and width larger than the requested height and width.
-        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
-            inSampleSize *= 2
+    fun load(url: String, width: Int, height: Int): Result<Bitmap> {
+        return kotlin.runCatching {
+            BitmapFactory.Options().run {
+                // First decode with inJustDecodeBounds=true to check dimensions
+                inJustDecodeBounds = true
+                BitmapFactory.decodeStream(
+                    URL(url).openStream().also { stream -> currentInputStream = stream },
+                    null,
+                    this
+                )
+                // Calculate inSampleSize
+                inSampleSize = calculateInSampleSize(this, width, height)
+                // Decode bitmap with inSampleSize set
+                inJustDecodeBounds = false
+                BitmapFactory.decodeStream(
+                    URL(url).openStream().also { stream -> currentInputStream = stream },
+                    null,
+                    this
+                )!!
+            }
         }
     }
-    return inSampleSize
-}
 
-private fun decodeSampledBitmap(
-    reqWidth: Int,
-    reqHeight: Int,
-    bitmapFactoryDecoderFunction: (BitmapFactory.Options) -> Bitmap?
-): Bitmap = BitmapFactory.Options().run {
-    // First decode with inJustDecodeBounds=true to check dimensions
-    inJustDecodeBounds = true
-    bitmapFactoryDecoderFunction(this)
-    // Calculate inSampleSize
-    inSampleSize = calculateInSampleSize(this, reqWidth, reqHeight)
-    // Decode bitmap with inSampleSize set
-    inJustDecodeBounds = false
-    requireNotNull(bitmapFactoryDecoderFunction(this))
-}
+    fun cancel() {
+        currentInputStream?.close()
+    }
 
-// TODO@carlosmuvi figure if caching brings benefits to our use case.
-// private val imageMemoryCache = object : LruCache<String, Bitmap>(
-//    // Use 1/8th of the available memory for this memory cache.
-//    (Runtime.getRuntime().maxMemory() / 1024).toInt() / 8
-// ) {
-//    override fun sizeOf(key: String, bitmap: Bitmap): Int {
-//        return bitmap.byteCount / 1024
-//    }
-// }
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int
+    ): Int {
+        // Raw height and width of image
+        val (height: Int, width: Int) = options.run { outHeight to outWidth }
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            // Calculate the largest inSampleSize value that is a power of 2 and keeps both
+            // height and width larger than the requested height and width.
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
+    }
+}

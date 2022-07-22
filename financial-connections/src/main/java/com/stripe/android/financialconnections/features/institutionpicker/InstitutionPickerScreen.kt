@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -313,7 +314,7 @@ private fun InstitutionResultTile(
     ) {
         StripeImage(
             url = "https://www.fillmurray.com/g/50/50",
-            placeholderResId = R.drawable.stripe_ic_brandicon_institution,
+            placeHolder = painterResource(R.drawable.stripe_ic_brandicon_institution),
             contentDescription = "",
             modifier = Modifier
                 .size(36.dp)
@@ -362,11 +363,12 @@ private fun FeaturedInstitutionsGrid(
                         .clickable { onInstitutionSelected(institution) }
                         .padding(8.dp)
                 ) {
-                    Text(
-                        text = institution.name,
-                        color = FinancialConnectionsTheme.colors.textPrimary,
-                        style = FinancialConnectionsTheme.typography.bodyEmphasized,
-                        textAlign = TextAlign.Center
+                    StripeImage(
+                        url = "https://www.fillmurray.com/g/500/500",
+                        placeHolder = painterResource(R.drawable.stripe_ic_brandicon_institution),
+                        contentDescription = "",
+                        modifier = Modifier
+                            .fillMaxSize()
                     )
                 }
             }
